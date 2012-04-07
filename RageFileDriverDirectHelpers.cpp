@@ -1,0 +1,285 @@
+#include "global.h"
+#include "RageFileDriverDirectHelpers.h"
+#include "RageUtil.h"
+#include "RageLog.h"
+
+#include <cerrno>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#include <dirent.h>
+#include <fcntl.h>
+
+bool PathReady( const CString &path )
+{
+#ifdef _WINDOWS
+	// Windows will throw up a message box if we try to write to a
+	// removable drive with no disk inserted.  Find out whether there's a 
+	// disk in the drive w/o writing a file.
+
+	// find drive letter
+	vector<CString> matches;
+	static Regex parse("^([A-Za-z]+):");
+	parse.Compare( path, matches );
+	if( matches.size() != 1 )
+		return false;
+
+	CString sDrive = matches[0];
+	TCHAR szVolumeNameBuffer[MAX_PATH];
+	DWORD dwVolumeSerialNumber;
+	DWORD dwMaximumComponentLength;
+	DWORD lpFileSystemFlags;
+	TCHAR szFileSystemNameBuffer[MAX_PATH];
+	BOOL bResult = GetVolumeInformation( 
+		sDrive + ":\\",
+		szVolumeNameBuffer,
+		sizeof(szVolumeNameBuffer),
+		&dwVolumeSerialNumber,
+		&dwMaximumComponentLength,
+		&lpFileSystemFlags,
+		szFileSystemNameBuffer,
+		sizeof(szFileSystemNameBuffer) );
+	return !!bResult;
+#else
+	// Try to create directory before writing a temp file.
+	CreateDirectories( path );
+	
+	// Try to write a file.
+	const CString sFile = path + "temp";
+	int fd = DoOpen( sFile, O_WRONLY|O_CREAT|O_TRUNC, 0644 ); //last arg is a bogus one
+	if( fd < 0 )
+		return false;
+
+	close( fd );
+	remove( sFile );
+	return true;
+#endif
+}
+
+/* mkdir -p.  Doesn't fail if Path already exists and is a directory. */
+bool CreateDirectories( const CString &Path )
+{
+	/* XXX: handle "//foo/bar" paths in Windows */
+	CStringArray parts;
+	CString curpath;
+
+	/* If Path is absolute, add the initial slash ("ignore empty" will remove it). */
+	if( Path.Left(1) == "/" )
+		curpath = "/";
+
+	/* Ignore empty, so eg. "/foo/bar//baz" doesn't try to create "/foo/bar" twice. */
+	split( Path, "/", parts, true );
+
+	for(unsigned i = 0; i < parts.size(); ++i)
+	{
+		if( i )
+			curpath += "/";
+		curpath += parts[i];
+
+#if defined(PSP)
+		if( (curpath.size() == 4 && curpath[3] == ':') ) /* ms0: or ef0: */
+		{
+			/* Don't try to create the drive letter alone. */
+			continue;
+		}
+#elif defined(WIN32)
+		if( (curpath.size() == 2 && curpath[1] == ':') )  /* C: */
+		{
+			/* Don't try to create the drive letter alone. */
+			continue;
+		}
+#endif
+
+		if( DoMkdir(curpath, 0755) == 0 )
+			continue;
+
+		/* When creating a directory that already exists over Samba, Windows is
+		 * returning ENOENT instead of EEXIST. */
+		/* I can't reproduce this anymore.  If we get ENOENT, log it but keep
+		 * going. */
+		if( errno == ENOENT && LOG )
+			LOG->Warn("Couldn't create %s: %s", curpath.c_str(), strerror(errno) );
+		if( errno == EEXIST || errno == ENOENT )
+			continue;		// we expect to see these errors
+
+		if( LOG )
+		{
+			LOG->Warn("Couldn't create %s: %s", curpath.c_str(), strerror(errno) );
+			return false;
+		}
+
+		/* Make sure it's a directory. */
+		struct stat st;
+		DoStat( curpath, &st );
+		if( !(st.st_mode & S_IFDIR) )
+		{
+			if( LOG )
+				LOG->Warn("Couldn't create %s: path exists and is not a directory", curpath.c_str() );
+			
+			return false;
+		}
+	}
+	
+	return true;
+}
+
+DirectFilenameDB::DirectFilenameDB( const CString &root_ )
+{
+	ExpireSeconds = 30;
+	root = root_;
+	if( root.Right(1) != "/" )
+		root += '/';
+	if( root == "./" )
+		root = "";
+}
+
+
+void DirectFilenameDB::PopulateFileSet( FileSet &fs, const CString &path )
+{
+	CString sPath = path;
+
+	/* Resolve path cases (path/Path -> PATH/path). */
+	ResolvePath( sPath );
+
+	fs.age.GetDeltaTime(); /* reset */
+	fs.files.clear();
+
+#ifdef PSP
+	SceUID d = sceIoDopen( root + sPath );
+	if( d < 0 )
+	{
+		LOG->MapLog("opendir " + root + "/" + sPath, "Couldn't opendir(%s%s): %s", root.c_str(), sPath.c_str(), strerror(errno));
+		return;
+	}
+
+	SceIoDirent ent;
+	memset( &ent, 0, sizeof(SceIoDirent) );
+
+	while( sceIoDread( d, &ent ) > 0 )
+	{
+//		if( !strcmp(ent.d_name, ".") || !strcmp(ent.d_name, "..") ) continue;
+		if( ent.d_name[0] == '.' ) continue;
+		
+		time_t time;
+		sceRtcGetTime_t( (const pspTime*)&ent.d_stat.st_mtime, &time );
+
+		File f;
+		f.SetName( ent.d_name );
+		f.dir = ent.d_stat.st_mode & FIO_S_IFDIR;
+		f.size = (int)ent.d_stat.st_size;
+		f.hash = time;
+		fs.files.insert( f );
+
+		memset( &ent, 0, sizeof(SceIoDirent) );
+	}
+	       
+	sceIoDclose( d );
+#elif defined(WIN32)
+	WIN32_FIND_DATA fd;
+
+	if ( sPath.size() > 0  && sPath.Right(1) == "/" )
+		sPath.erase( sPath.size() - 1 );
+
+	HANDLE hFind = DoFindFirstFile( root+sPath+"/*", &fd );
+	CHECKPOINT_M( root+sPath+"/*" );
+
+	if( hFind == INVALID_HANDLE_VALUE )
+		return;
+
+	do {
+		if(!strcmp(fd.cFileName, ".") || !strcmp(fd.cFileName, ".."))
+			continue;
+
+		File f;
+		f.SetName( fd.cFileName );
+		f.dir = !!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+		f.size = fd.nFileSizeLow;
+		f.hash = fd.ftLastWriteTime.dwLowDateTime;
+
+		fs.files.insert(f);
+	} while( FindNextFile( hFind, &fd ) );
+	FindClose(hFind);
+#else
+	int OldDir = DoOpen(".", O_RDONLY);
+	if( OldDir == -1 )
+		RageException::Throw( "Couldn't open(.): %s", strerror(errno) );
+
+	if( chdir(root+sPath) == -1 )
+	{
+		/* Only log once per dir. */
+		if( LOG && errno != ENOENT )
+			LOG->MapLog("chdir " + root+"/"+sPath, "Couldn't chdir(%s%s): %s", root.c_str(), sPath.c_str(), strerror(errno) );
+		close( OldDir );
+		return;
+	}
+
+	DIR *d = opendir(".");
+	if( d == NULL )
+	{
+		LOG->MapLog("opendir " + root+"/"+sPath, "Couldn't opendir(%s%s): %s", root.c_str(), sPath.c_str(), strerror(errno) );
+		if( fchdir( OldDir ) == -1 )
+			RageException::Throw( "Couldn't fchdir(): %s", strerror(errno) );
+		close( OldDir );
+		return;
+	}
+
+	while(struct dirent *ent = readdir(d))
+	{
+		if(!strcmp(ent->d_name, ".")) continue;
+		if(!strcmp(ent->d_name, "..")) continue;
+		
+		File f;
+		f.SetName( ent->d_name );
+		
+		struct stat st;
+		if( DoStat(ent->d_name, &st) == -1 )
+		{
+			/* If it's a broken symlink, ignore it.  Otherwise, warn. */
+			if( lstat(ent->d_name, &st) == 0 )
+				continue;
+			
+			/* Huh? */
+			if(LOG)
+				LOG->Warn("Got file '%s' in '%s' from list, but can't stat? (%s)",
+					ent->d_name, sPath.c_str(), strerror(errno));
+			continue;
+		} else {
+			f.dir = (st.st_mode & S_IFDIR);
+			f.size = st.st_size;
+			f.hash = st.st_mtime;
+		}
+
+		fs.files.insert(f);
+	}
+	       
+	closedir(d);
+	if( fchdir( OldDir ) == -1 )
+		RageException::Throw( "Couldn't fchdir(): %s", strerror(errno) );
+	close( OldDir );
+#endif
+}
+
+/*
+ * Copyright (c) 2003-2004 Glenn Maynard, Chris Danford
+ * All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, and/or sell copies of the Software, and to permit persons to
+ * whom the Software is furnished to do so, provided that the above
+ * copyright notice(s) and this permission notice appear in all copies of
+ * the Software and that both the above copyright notice(s) and this
+ * permission notice appear in supporting documentation.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+ * THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS
+ * INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT
+ * OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+ * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+ * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */

@@ -1,0 +1,356 @@
+/*
+ * RageDisplay: Methods common to all RageDisplays
+ */
+
+#ifndef RAGEDISPLAY_H
+#define RAGEDISPLAY_H
+
+#include "RageTypes.h"
+#include "ModelTypes.h"
+
+const int REFRESH_DEFAULT = 0;
+struct RageSurface;
+const int MAX_TEXTURE_UNITS = 2;
+
+// RageCompiledGeometry holds vertex data in a format that is most efficient 
+// for the graphics API.
+class RageCompiledGeometry
+{
+public:
+	virtual ~RageCompiledGeometry() { }
+
+	void Set( const vector<msMesh> &vMeshes )
+	{
+		size_t totalVerts = 0;
+		size_t totalTriangles = 0;
+
+		m_vMeshInfo.resize( vMeshes.size() );
+		for( unsigned i=0; i<vMeshes.size(); i++ )
+		{
+			const vector<RageModelVertex> &Vertices = vMeshes[i].Vertices;
+			const vector<msTriangle> &Triangles = vMeshes[i].Triangles;
+
+			MeshInfo& meshInfo = m_vMeshInfo[i];
+
+			meshInfo.iVertexStart = totalVerts;
+			meshInfo.iVertexCount = Vertices.size();
+			meshInfo.iTriangleStart = totalTriangles;
+			meshInfo.iTriangleCount = Triangles.size();
+
+			totalVerts += Vertices.size();
+			totalTriangles += Triangles.size();
+		}
+
+		this->Allocate( vMeshes );
+
+		Change( vMeshes );
+	}
+
+	virtual void Allocate( const vector<msMesh> &vMeshes ) = 0;	// allocate space
+	virtual void Change( const vector<msMesh> &vMeshes ) = 0;	// new data must be the same size as was passed to Set()
+	virtual void Draw( int iMeshIndex ) const = 0;
+
+protected:
+	size_t GetTotalVertices()  { if( m_vMeshInfo.empty() ) return 0; return m_vMeshInfo.back().iVertexStart + m_vMeshInfo.back().iVertexCount; }
+	size_t GetTotalTriangles() { if( m_vMeshInfo.empty() ) return 0; return m_vMeshInfo.back().iTriangleStart + m_vMeshInfo.back().iTriangleCount; }
+	
+	struct MeshInfo
+	{
+		int iVertexStart;
+		int iVertexCount;
+		int iTriangleStart;
+		int iTriangleCount;
+	};
+	vector<MeshInfo>	m_vMeshInfo;
+};
+
+class RageDisplay
+{
+	friend class RageTexture;
+
+public:
+
+	struct PixelFormatDesc {
+		int bpp;
+		unsigned int masks[4];
+	};
+
+	enum PixelFormat {
+		FMT_RGBA8 = 0,
+		FMT_RGBA4,
+		FMT_RGB5A1,
+		FMT_RGB5,
+		FMT_RGB8,
+		FMT_PAL,
+		/* The above formats differ between OpenGL and D3D. These are provided as
+		* alternatives for OpenGL that match some format in D3D.  Don't use them
+		* directly; they'll be matched automatically by FindPixelFormat. */
+		FMT_BGR8,
+		FMT_A1BGR5,
+		NUM_PIX_FORMATS
+	};
+
+	static CString PixelFormatToString( PixelFormat pixfmt );
+	virtual const PixelFormatDesc *GetPixelFormatDesc(PixelFormat pf) const = 0;
+
+	struct VideoModeParams
+	{
+		// Initialize with a constructor so to guarantee all paramters
+		// are filled (in case new params are added).
+		VideoModeParams( 
+			int width_,
+			int height_,
+			int bpp_,
+			int rate_,
+			bool vsync_,
+			bool interlaced_,
+			bool bSmoothLines_,
+			bool bTrilinearFiltering_,
+			bool bAnisotropicFiltering_,
+			bool PAL_
+		)
+		{
+			width = width_;
+			height = height_;
+			bpp = bpp_;
+			rate = rate_;
+			vsync = vsync_;
+			interlaced = interlaced_;
+			bSmoothLines = bSmoothLines_;
+			bTrilinearFiltering = bTrilinearFiltering_;
+			bAnisotropicFiltering = bAnisotropicFiltering_;
+			PAL = PAL_;
+		}
+		VideoModeParams() {}
+
+		int width;
+		int height;
+		int bpp;
+		int rate;
+		bool vsync;
+		bool bSmoothLines;
+		bool bTrilinearFiltering;
+		bool bAnisotropicFiltering;
+		bool interlaced;
+		bool PAL;
+	};
+
+	/* This is needed or the overridden classes' dtors will not be called. */
+	virtual ~RageDisplay() { }
+
+	virtual void Update(float fDeltaTime) { }
+
+	// Don't override this.  Override TryVideoMode() instead.
+	// This will set the video mode to be as close as possible to params.
+	// Return true if device was re-created and we need to reload textures.
+	bool SetVideoMode( VideoModeParams params );
+
+	/* Call this when the resolution has been changed externally: */
+	virtual void ResolutionChanged() { }
+
+	virtual bool BeginFrame() = 0;	
+	virtual void EndFrame() = 0;
+	virtual VideoModeParams GetVideoModeParams() const = 0;
+	
+	virtual void SetBlendMode( BlendMode mode ) = 0;
+
+	virtual bool SupportsTextureFormat( PixelFormat pixfmt, bool realtime=false ) = 0;
+
+	/* return 0 if failed or internal texture resource handle 
+	 * (unsigned in OpenGL, texture pointer in D3D) */
+	virtual unsigned CreateTexture( 
+		PixelFormat pixfmt,			// format of img and of texture in video mem
+		RageSurface* img, 			// must be in pixfmt
+		bool bGenerateMipMaps
+		) = 0;
+	virtual void UpdateTexture( 
+		unsigned uTexHandle, 
+		RageSurface* img,
+		int width, int height 
+		) = 0;
+	virtual void DeleteTexture( unsigned uTexHandle ) = 0;
+	virtual void ClearAllTextures() = 0;
+	virtual void SetTexture( int iTextureUnitIndex, RageTexture* pTexture ) = 0;
+	virtual void SetTextureModeModulate() = 0;
+	virtual void SetTextureModeGlow( GlowMode m=GLOW_WHITEN ) = 0;
+	virtual void SetTextureModeAdd() = 0;
+	virtual void SetTextureWrapping( bool b ) = 0;
+	virtual int GetMaxTextureSize() const = 0;
+	virtual void SetTextureFiltering( bool b ) = 0;
+
+	virtual bool IsZTestEnabled() const = 0;
+	virtual bool IsZWriteEnabled() const = 0;
+	virtual void SetZWrite( bool b ) = 0;
+	virtual void SetZTestMode( ZTestMode mode ) = 0;
+	virtual void ClearZBuffer() = 0;
+
+	virtual void SetCullMode( CullMode mode ) = 0;
+	
+	virtual void SetAlphaTest( bool b ) = 0;
+	
+	virtual void SetMaterial( 
+		const RageColor &emissive,
+		const RageColor &ambient,
+		const RageColor &diffuse,
+		const RageColor &specular,
+		float shininess
+		) = 0;
+
+	virtual void SetLighting( bool b ) = 0;
+	virtual void SetLightOff() = 0;
+	virtual void SetLightDirectional( 
+		const RageColor &ambient, 
+		const RageColor &diffuse, 
+		const RageColor &specular, 
+		const RageVector3 &dir ) = 0;
+
+	virtual void SetSphereEnironmentMapping( bool b ) = 0;
+
+	virtual RageCompiledGeometry* CreateCompiledGeometry() = 0;
+	virtual void DeleteCompiledGeometry( RageCompiledGeometry* p ) = 0;
+
+	void DrawQuads( const RageSpriteVertex v[], int iNumVerts );
+	void DrawQuadStrip( const RageSpriteVertex v[], int iNumVerts );
+	void DrawFan( const RageSpriteVertex v[], int iNumVerts );
+	void DrawStrip( const RageSpriteVertex v[], int iNumVerts );
+	void DrawTriangles( const RageSpriteVertex v[], int iNumVerts );
+	void DrawCompiledGeometry( const RageCompiledGeometry *p, int iMeshIndex, const vector<msMesh> &vMeshes );
+	void DrawLineStrip( const RageSpriteVertex v[], int iNumVerts, float LineWidth );
+	void DrawCircle( const RageSpriteVertex &v, float radius );
+
+	void DrawQuad( const RageSpriteVertex v[4] ) { DrawQuads(v,4); } /* alias. upper-left, upper-right, lower-left, lower-right */
+	virtual void DrawRectAngle( const RageSpriteVertex v[4] ) { DrawQuad(v); }
+
+	// hacks for cell-shaded models
+	virtual void SetPolygonMode( PolygonMode pm ) {}
+	virtual void SetLineWidth( float fWidth ) {}
+
+	enum GraphicsFileFormat
+	{
+		SAVE_LOSSLESS = 0, // bmp
+		SAVE_LOSSY_LOW_QUAL, // jpg
+		SAVE_LOSSY_HIGH_QUAL // jpg
+	};
+	bool SaveScreenshot( const CString &sPath, GraphicsFileFormat format );
+
+	virtual CString GetTextureDiagnostics( unsigned id ) const { return ""; }
+
+protected:
+	virtual void DrawQuadsInternal( const RageSpriteVertex v[], int iNumVerts ) = 0;
+	virtual void DrawQuadStripInternal( const RageSpriteVertex v[], int iNumVerts ) = 0;
+	virtual void DrawFanInternal( const RageSpriteVertex v[], int iNumVerts ) = 0;
+	virtual void DrawStripInternal( const RageSpriteVertex v[], int iNumVerts ) = 0;
+	virtual void DrawTrianglesInternal( const RageSpriteVertex v[], int iNumVerts ) = 0;
+	virtual void DrawCompiledGeometryInternal( const RageCompiledGeometry *p, int iMeshIndex ) = 0;
+	virtual void DrawLineStripInternal( const RageSpriteVertex v[], int iNumVerts, float LineWidth );
+	virtual void DrawCircleInternal( const RageSpriteVertex &v, float radius );
+
+	// Return "" if mode change was successful, an error message otherwise.
+	// bNewDeviceOut is set true if a new device was created and textures
+	// need to be reloaded.
+	virtual CString TryVideoMode( VideoModeParams params, bool &bNewDeviceOut ) = 0;
+	virtual RageSurface* CreateScreenshot() = 0;	// allocates a surface.  Caller must delete it.
+
+	virtual void SetViewport(int shift_left, int shift_down) = 0;
+
+	void DrawPolyLine(const RageSpriteVertex &p1, const RageSpriteVertex &p2, float LineWidth );
+
+
+	// Stuff in RageDisplay.cpp
+	void SetDefaultRenderStates();
+
+public:
+	/* Statistics */
+	int GetFPS() const;
+	int GetVPF() const;
+	int GetCumFPS() const; /* average FPS since last reset */
+	void ResetStats();
+	void ProcessStatsOnFlip();
+	void StatsAddVerts( int iNumVertsRendered );
+
+	/* World matrix stack functions. */
+	void PushMatrix();
+	void PopMatrix();
+	void Translate( const RageVector3 &pos );
+	void TranslateWorld( const RageVector3 &pos );
+	void Scale( const RageVector3 &scale );
+	void RotateX( float deg );
+	void RotateY( float deg );
+	void RotateZ( float deg );
+	void MultMatrix( const RageMatrix &f ) { this->PostMultMatrix(f); } /* alias */
+	void PostMultMatrix( const RageMatrix &f );
+	void PreMultMatrix( const RageMatrix &f );
+	void LoadIdentity();
+
+	/* Texture matrix functions */
+	void TexturePushMatrix();
+	void TexturePopMatrix();
+	void TextureTranslate( const RageVector3 &pos );
+
+	/* Projection and View matrix stack functions. */
+	void CameraPushMatrix();
+	void CameraPopMatrix();
+	void LoadMenuPerspective( float fovDegrees, float fVanishPointX, float fVanishPointY );
+	void LoadLookAt( float fov, const RageVector3 &Eye, const RageVector3 &At, const RageVector3 &Up );
+
+	/* Centering matrix */
+	void ChangeCentering( int trans_x, int trans_y, float scale_x, float scale_y );
+
+	RageSurface *CreateSurfaceFromPixfmt( PixelFormat pixfmt, void *pixels, int width, int height, int pitch );
+	PixelFormat FindPixelFormat( int bpp, int Rmask, int Gmask, int Bmask, int Amask, bool realtime=false );
+
+protected:
+	void GetPerspectiveMatrix( RageMatrix *pOut, float fovy, float aspect, float zNear, float zFar );
+
+	// Different for D3D and OpenGL.  Not sure why they're not compatible. -Chris
+	virtual void GetOrthoMatrix( RageMatrix *pOut, float l, float r, float b, float t, float zn, float zf ) = 0; 
+	virtual void GetFrustumMatrix( RageMatrix *pOut, float l, float r, float b, float t, float zn, float zf ); 
+
+	//
+	// Matrix that adjusts position and scale of image on the screen
+	//
+	RageMatrix m_Centering;
+	bool m_bCenteringUpdate;
+
+	// Called by the RageDisplay derivitives
+	const RageMatrix* GetCentering() { return &m_Centering; }
+	const RageMatrix* GetProjectionTop();
+	const RageMatrix* GetViewTop();
+	const RageMatrix* GetWorldTop();
+	const RageMatrix* GetTextureTop();
+
+	bool UpdateCenteringMatrix() { bool b = m_bCenteringUpdate; m_bCenteringUpdate = false; return b; }
+	bool UpdateProjectionMatrix();
+	bool UpdateViewMatrix();
+	bool UpdateWorldMatrix();
+	bool UpdateTextureMatrix();
+};
+
+
+extern RageDisplay*		DISPLAY;	// global and accessable from anywhere in our program
+
+#endif
+/*
+ * Copyright (c) 2001-2004 Chris Danford, Glenn Maynard
+ * All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, and/or sell copies of the Software, and to permit persons to
+ * whom the Software is furnished to do so, provided that the above
+ * copyright notice(s) and this permission notice appear in all copies of
+ * the Software and that both the above copyright notice(s) and this
+ * permission notice appear in supporting documentation.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+ * THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS
+ * INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT
+ * OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+ * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+ * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
