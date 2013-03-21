@@ -1,0 +1,8 @@
+# Object files
+*.o
+
+# PSP binaries
+stepmania.elf
+stepmania.prx
+PARAM.SFO
+EBOOT.PBP
