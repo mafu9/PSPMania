@@ -1,68 +1,70 @@
-PSPMania   by mafu
+PSPMania
+by mafu
 
 
 ------------------------------------------------------------------------------------------
 1, Whats this?
 ------------------------------------------------------------------------------------------
-  This is that "StepMania 3.9" that is as famous for DDR simulator is transplanted for PSP.
+  This is StepMania 3.9, a famous rhythm game simulator, ported to the PSP.
 
   For more information on StepMania, please see http://www.stepmania.com/.
-  Especially, anyone who hasnt yet played StepMania should see the site.
-  This text is written only about differences from "Stepmania 3.9".
+  Anyone who hasn't played StepMania before should visit the site.
+  This file mainly goes into the differences from the PC StepMania 3.9.
 
-  This game is...
-    * I wanna use cool skins.
-    * I wanna play with different options.
-  If stated above requests are applied, this game will be recommended.
+  You should use this if the following applies to you:
+    * I want to use cool skins.
+    * I want to play with different options.
 
-  If following requests are applied, PSPRevolution will be recommended.
+  If these matter more to you, we recomment PSPRevolution instead:
     * I fuss over about skins.
-    * I dont use many options.
-    * I wanna play smoothly.
+    * I don't use many options.
+    * I want to play smoothly.
 
   Specifications may change in the future.
 
-  Whatever happened, i dont take any responsibility for that.
-  After understanding above, please go the introduction and play.
+  I don't take any responsibility for any problems that may arise.
+  Once you understand the above, please read the introduction and go play.
 
 
 ------------------------------------------------------------------------------------------
 2, Minimum Requirements
 ------------------------------------------------------------------------------------------
-  * PSP-2000 (required CFW)
-  * PSP-3000 (required CFW)
-  * PSP go Å@(required CFW)
-  I dont know HBL and VHBL well.
+  * PSP-2000
+  * PSP-3000
+  * PSP Go
+  Requires CFW, CFW or HEN installation.
+  I don't know HBL and VHBL well.
 
-  Though you can even boot on PSP-1000 and unmodified PSP, this game may not work well.
-  This is because they arent allowed to use the ExtraMemory.
+  Though you can boot on PSP-1000 and even an unmodified PSP, this game may
+  not work well. This is because they aren't allowed to use the ExtraMemory.
 
 
 ------------------------------------------------------------------------------------------
 3, Installation
 ------------------------------------------------------------------------------------------
   Copy "PSPMania" folder to PSP/GAME/.
-  When you add songs, please have enough free space in your device to create their caches.
-  It takes a long time on creating caches. (ex. about 30 minutes at 700 songs)
+  When you add songs, please have enough free space in your device to create
+  the cache files. It takes a long time to creating caches.
+  (ex. about 30 minutes for 700 songs)
 
-  You can use smzip format, but it doesnt be recommended.
-  The format will cause the out of memory and the processing fall.
+  You can use smzip format, but it's not recommended.
+  The format will cause out of memory errors and the program may crash.
 
 
 ------------------------------------------------------------------------------------------
 4, Differences from Stepmania
 ------------------------------------------------------------------------------------------
-  A CPU clock option was added at MachineOptions. But it doesnt work on ME series.
+  A CPU clock option was added at MachineOptions. But it doesn't work on ME series.
 
-  By default, Enter=START ESC=SELECT.
-  If you take a screenshot, push analog stick down with pressing RL Trigger.
+  By default, Enter=START and ESC=SELECT.
+  To take a screenshot, push analog stick down while pressing RL Trigger.
 
   The following features are not supported.
-    * Encryption profile (deleted because program size will be bloated) 
-    * Creation and Editing of songs (deleted because PSP doesnt have enough buttons)
-    * Korean at KSF (character code conversion problem)
-    * 3D character (not implemented)
-    * Battle (not implemented)
+    * Profile encryption (deleted because program size will be bloated)
+    * Editing/Creation of songs (deleted because PSP doesn't have enough buttons)
+    * Korean characters in KSF files (character code conversion problem)
+    * 3D characters (not implemented)
+    * Battle Mode (not implemented)
 
 
 ------------------------------------------------------------------------------------------
@@ -73,8 +75,8 @@ PSPMania   by mafu
 
   * In some cases this game may unexpectedly quit due to lack of memory.
 
-  * GrooveRader and LifeBar are not displayed well.
-    They are under investigation at present.
+  * GrooveRadar and LifeBar are not displayed correctly.
+    They are currently under investigation.
 
   * Default skin is so rough :P
     I hope more and more people create skins.
@@ -83,34 +85,39 @@ PSPMania   by mafu
 ------------------------------------------------------------------------------------------
 6, On Creating Skins
 ------------------------------------------------------------------------------------------
-  It is better to use 256 palette colors (indexed colors).
-  It saves memory and drawing is fast.
-  ScreenEdit cannot be used.
-  It is better to use WAV format at SE, because it doesnt need to be decoded.
-  Arrow size is 36px at present.
+  * It's better to use 256 palette colors (indexed colors).
+    It saves memory and drawing is fast.
+
+  * ScreenEdit cannot be used.
+
+  * It's better to use WAV format for sound effects because it doesn't
+    need to be decoded.
+
+  * Arrow size is currently 36px.
 
 
 ------------------------------------------------------------------------------------------
 7, FAQ
 ------------------------------------------------------------------------------------------
-  Was returned to the XMB(the menu screen of PSP) suddenly.
-    Read a log file in the root directory of your device.
+  Q. Was returned to the XMB(the menu screen of PSP) suddenly.
+  A. Read a log file in the root directory of your device.
 
-  Strange sound or sound quality is poor.
-    This is because the sampling frequency is not 44100Hz. Convert it to 44100Hz.
+  Q. Strange sound or sound quality is poor.
+  A. This is because the sampling frequency is not 44100Hz. Convert it to 44100Hz.
 
-  I wanna share songs with PSP Revolution.
-    You can use AdditionalSongFolders at Data/StepMania.ini.
-    ex1.                AdditionalSongFolders=../PSPRevolution v0.4/Songs/
-    ex2(except PSP go). AdditionalSongFolders=ms0:/PSP/GAME/PSPRevolution v0.4/Songs/
-    ex3(only PSP go).   AdditionalSongFolders=ef0:/PSP/GAME/PSPRevolution v0.4/Songs/
+  Q. I want to share songs with PSP Revolution.
+  A. You can use AdditionalSongFolders at Data/StepMania.ini.
+     ex1.                AdditionalSongFolders=../PSPRevolution v0.4/Songs/
+     ex2(except PSP Go). AdditionalSongFolders=ms0:/PSP/GAME/PSPRevolution v0.4/Songs/
+     ex3(only PSP Go).   AdditionalSongFolders=ef0:/PSP/GAME/PSPRevolution v0.4/Songs/
 
-  Is a strange background.
-    Delete video files at the song folder.
+  Q. Is a strange background.
+  A. Delete video files at the song folder.
 
 ------------------------------------------------------------------------------------------
 8, About Source Code
 ------------------------------------------------------------------------------------------
   To build, need to install PSPSDK.
-  I use MinPSPW 0.11 on Microsoft Visual C++ 2010 Express.
+  I use Minimalist PSPSDK for Windows(http://sourceforge.net/projects/minpspw/) 0.11
+  on Microsoft Visual C++ 2010 Express.
 
