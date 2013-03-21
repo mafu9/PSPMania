@@ -220,7 +220,7 @@ void RageLog::Write( int where, const CString &line )
 	if( m_bLogToDisk && g_fileLog->IsOpen() && (where & WRITE_LOUD) )
 		g_fileLog->PutLine( "/////////////////////////////////////////" );
 	if( where & WRITE_LOUD )
-		printf( "/////////////////////////////////////////\n" );
+		fprintf( stdout, "/////////////////////////////////////////\n" );
 
 	CString sTimestamp = SecondsToMMSSMsMsMs(RageTimer::GetTimeSinceStart()) + ": ";
 	CString sWarning;
@@ -235,7 +235,7 @@ void RageLog::Write( int where, const CString &line )
 			str.insert( 0, sWarning );
 
 		if( m_bShowLogOutput || where != 0 )
-			printf("%s\n", str.c_str() );
+			fprintf( stdout, "%s\n", str.c_str() );
 		if( where & WRITE_TO_INFO )
 			AddToInfo( str );
 		if( m_bLogToDisk && (where&WRITE_TO_INFO) && g_fileInfo->IsOpen() )
@@ -254,7 +254,7 @@ void RageLog::Write( int where, const CString &line )
 	if( m_bLogToDisk && g_fileLog->IsOpen() && (where & WRITE_LOUD) )
 		g_fileLog->PutLine( "/////////////////////////////////////////" );
 	if( where & WRITE_LOUD )
-		printf( "/////////////////////////////////////////\n" );
+		fprintf( stdout, "/////////////////////////////////////////\n" );
 
 	if( m_bFlush || (where & WRITE_TO_INFO) )
 		Flush();

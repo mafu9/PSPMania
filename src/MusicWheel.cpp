@@ -738,7 +738,7 @@ void MusicWheel::GetItemPosition( float fPosOffsetsFromMiddle, RageVector3 &pos_
 		pos_out.z = -100+WHEEL_3D_RADIUS*cosf(fRotationX_out);
 		fRotationX_out *= 180.f/PI;	// to degrees
 
-//		printf( "fRotationX_out = %f\n", fRotationX_out );
+//		fprintf( stdout, "fRotationX_out = %f\n", fRotationX_out );
 	}
 	else if(!USE_LINEAR_WHEEL)
 	{

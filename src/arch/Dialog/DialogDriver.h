@@ -6,7 +6,7 @@
 class DialogDriver
 {
 public:
-	virtual void Error( CString sMessage, CString ID ) { printf("Error: %s\n", sMessage.c_str()); }
+	virtual void Error( CString sMessage, CString ID ) { fprintf(stderr, "Error: %s\n", sMessage.c_str()); }
 	virtual void OK( CString sMessage, CString ID ) {}
 	virtual Dialog::Result AbortRetryIgnore( CString sMessage, CString ID ) { return Dialog::ignore; } 
 	virtual Dialog::Result RetryCancel( CString sMessage, CString ID ) { return Dialog::cancel; } 

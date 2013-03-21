@@ -5,7 +5,8 @@
 void NORETURN sm_crash( const char *reason )
 {
 #ifdef PSP
-	printf( "%s\n", reason );
+	fprintf( stderr, "%s\n", reason );
+	fflush( stderr );
 	TempLog( "%s\n", reason );
 	sceKernelExitGame();
 

@@ -44,8 +44,8 @@ void RageException::Throw(const char *fmt, ...)
 	}
 	else
 	{
-		printf("%s\n", msg.c_str());
-		fflush(stdout);
+		fprintf(stderr, "%s\n", msg.c_str());
+		fflush(stderr);
 	}
 
 #if defined(_WINDOWS) && defined(DEBUG)

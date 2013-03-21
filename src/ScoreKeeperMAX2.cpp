@@ -300,7 +300,7 @@ void ScoreKeeperMAX2::AddScore( TapNoteScore score )
 	
 	ASSERT( iScore >= 0 );
 
-//	printf( "score: %i\n", iScore );
+//	fprintf( stdout, "score: %i\n", iScore );
 }
 
 void ScoreKeeperMAX2::HandleTapScore( TapNoteScore score )
